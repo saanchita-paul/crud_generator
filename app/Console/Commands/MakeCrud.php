@@ -34,14 +34,35 @@ class MakeCrud extends Command
 
     protected function generateModel($modelName, $fields, $relations)
     {
-        $fillableFields = collect(explode(',', $fields))
-            ->map(fn($field) => "'" . explode(':', trim($field))[0] . "'")
-            ->implode(', ');
+        $fieldsArray = explode(',', $fields);
+        $fillableFields = [];
+
+        foreach ($fieldsArray as $field) {
+            $fieldParts = explode(':', trim($field));
+
+            // Ensure valid field definition
+            if (count($fieldParts) < 2) {
+                $this->error("Invalid field definition: $field");
+                continue;
+            }
+
+            $fillableFields[] = "'" . $fieldParts[0] . "'";
+        }
+
+        $fillableString = implode(', ', $fillableFields);
 
         $relationsCode = '';
-        if ($relations) {
+        if (!empty($relations)) {
             foreach (explode(',', $relations) as $relation) {
-                [$relatedModel, $type] = explode(':', trim($relation));
+                $relationParts = explode(':', trim($relation));
+
+                // Ensure relation definition is valid
+                if (count($relationParts) < 2) {
+                    $this->error("Invalid relation definition: $relation");
+                    continue;
+                }
+
+                [$relatedModel, $type] = $relationParts;
                 $relatedModel = Str::studly($relatedModel);
 
                 if ($type === 'hasMany') {
@@ -52,29 +73,32 @@ class MakeCrud extends Command
                     $relationsCode .= "\n    public function " . Str::camel($relatedModel) . "() {\n";
                     $relationsCode .= "        return \$this->belongsTo($relatedModel::class);\n";
                     $relationsCode .= "    }\n";
+                } else {
+                    $this->error("Invalid relation type: $type for $relatedModel");
                 }
             }
         }
 
         $modelTemplate = "<?php
 
-                        namespace App\Models;
+namespace App\Models;
 
-                        use Illuminate\Database\Eloquent\Factories\HasFactory;
-                        use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
-                        class $modelName extends Model
-                        {
-                            use HasFactory;
+class $modelName extends Model
+{
+    use HasFactory;
 
-                            protected \$fillable = [$fillableFields];
+    protected \$fillable = [$fillableString];
 
-                            $relationsCode
-                        }";
+    $relationsCode
+}";
 
         File::put(app_path("Models/{$modelName}.php"), $modelTemplate);
         $this->info("Model $modelName created successfully.");
     }
+
 
 
     protected function generateMigration($modelName, $fields)
@@ -86,89 +110,66 @@ class MakeCrud extends Command
 
         $schemaFields = '';
         foreach (explode(',', $fields) as $field) {
-            [$name, $type] = explode(':', trim($field));
+            $field = trim($field);
 
-            if ($type === 'string') {
-                $schemaFields .= "\$table->string('$name');\n            ";
-            } elseif ($type === 'text') {
-                $schemaFields .= "\$table->text('$name');\n            ";
-            } elseif (str_starts_with($type, 'enum')) {
-                preg_match('/enum\((.*?)\)/', $type, $matches);
-                $values = str_replace(',', "','", $matches[1]);
-                $schemaFields .= "\$table->enum('$name', ['$values']);\n            ";
+            // Handle the case where field type contains colons (like enum values)
+            $firstColonPos = strpos($field, ':');
+            if ($firstColonPos === false) {
+                $this->error("Invalid field definition: $field");
+                continue;
+            }
+
+            $name = substr($field, 0, $firstColonPos);
+            $typeDefinition = substr($field, $firstColonPos + 1);
+
+            // Handle enum fields
+            if (str_starts_with($typeDefinition, 'enum(')) {
+                $enumValues = substr($typeDefinition, 5, -1); // Remove 'enum(' and ')'
+                $values = array_map(function($value) {
+                    return "'" . trim($value, " '\"") . "'"; // Trim spaces and quotes
+                }, explode(',', $enumValues));
+
+                $valuesString = implode(', ', $values);
+                $schemaFields .= "\$table->enum('$name', [$valuesString]);\n            ";
+            } else {
+                // Handle regular field types
+                switch ($typeDefinition) {
+                    case 'string':
+                        $schemaFields .= "\$table->string('$name');\n            ";
+                        break;
+                    case 'text':
+                        $schemaFields .= "\$table->text('$name');\n            ";
+                        break;
+                    default:
+                        $schemaFields .= "\$table->$typeDefinition('$name');\n            ";
+                }
             }
         }
 
         $migrationTemplate = "<?php
 
-                            use Illuminate\Database\Migrations\Migration;
-                            use Illuminate\Database\Schema\Blueprint;
-                            use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-                            return new class extends Migration {
-                                public function up()
-                                {
-                                    Schema::create('$tableName', function (Blueprint \$table) {
-                                        \$table->id();
-                                        $schemaFields
-                                        \$table->timestamps();
-                                    });
-                                }
+return new class extends Migration {
+    public function up()
+    {
+        Schema::create('$tableName', function (Blueprint \$table) {
+            \$table->id();
+            $schemaFields
+            \$table->timestamps();
+        });
+    }
 
-                                public function down()
-                                {
-                                    Schema::dropIfExists('$tableName');
-                                }
-                            };";
+    public function down()
+    {
+        Schema::dropIfExists('$tableName');
+    }
+};";
 
         File::put($migrationFile, $migrationTemplate);
         $this->info("Migration for $modelName created successfully.");
-    }
-
-
-    protected function generateController($modelName)
-    {
-        $controllerTemplate = "<?php
-
-                    namespace App\Http\Controllers;
-
-                    use App\Models\\$modelName;
-                    use App\Http\Requests\\{$modelName}Request;
-                    use Illuminate\Http\Request;
-
-                    class {$modelName}Controller extends Controller
-                    {
-                        public function index()
-                        {
-                            return response()->json($modelName::all());
-                        }
-
-                        public function store({$modelName}Request \$request)
-                        {
-                            \$record = $modelName::create(\$request->validated());
-                            return response()->json(\$record, 201);
-                        }
-
-                        public function show($modelName \$record)
-                        {
-                            return response()->json(\$record);
-                        }
-
-                        public function update({$modelName}Request \$request, $modelName \$record)
-                        {
-                            \$record->update(\$request->validated());
-                            return response()->json(\$record);
-                        }
-
-                        public function destroy($modelName \$record)
-                        {
-                            \$record->delete();
-                            return response()->json(null, 204);
-                        }
-                    }";
-
-        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
-        $this->info("Controller for $modelName created successfully.");
     }
 
 
@@ -179,37 +180,102 @@ class MakeCrud extends Command
 
         $validationRules = '';
         foreach (explode(',', $fields) as $field) {
-            [$name, $type] = explode(':', trim($field));
+            $field = trim($field);
+            $fieldParts = explode(':', $field, 2); // Split only on first colon
 
-            if ($type === 'string') {
-                $validationRules .= "'$name' => 'required|string|max:255',\n            ";
-            } elseif ($type === 'text') {
-                $validationRules .= "'$name' => 'nullable|string',\n            ";
-            } elseif (str_starts_with($type, 'enum')) {
-                preg_match('/enum\((.*?)\)/', $type, $matches);
-                $values = str_replace(',', "','", $matches[1]);
+            if (count($fieldParts) < 2) {
+                $this->error("Invalid field definition: $field");
+                continue;
+            }
+
+            [$name, $type] = $fieldParts;
+
+            // Handle enum fields specially
+            if (str_starts_with($type, 'enum(') && str_ends_with($type, ')')) {
+                $enumValues = str_replace(['enum(', ')'], '', $type);
+                $values = str_replace(',', ',', $enumValues); // Keep values as they are
                 $validationRules .= "'$name' => 'required|in:$values',\n            ";
+            } else {
+                // Handle regular field types
+                switch ($type) {
+                    case 'string':
+                        $validationRules .= "'$name' => 'required|string|max:255',\n            ";
+                        break;
+                    case 'text':
+                        $validationRules .= "'$name' => 'nullable|string',\n            ";
+                        break;
+                    default:
+                        $validationRules .= "'$name' => 'required',\n            ";
+                }
             }
         }
 
         $requestTemplate = "<?php
 
-                    namespace App\Http\Requests;
+namespace App\Http\Requests;
 
-                    use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-                    class $requestClass extends FormRequest
-                    {
-                        public function rules()
-                        {
-                            return [
-                                $validationRules
-                            ];
-                        }
-                    }";
+class $requestClass extends FormRequest
+{
+    public function rules()
+    {
+        return [
+            $validationRules
+        ];
+    }
+}";
 
-        File::put(app_path("Http/Requests/{$requestClass}.php"), $requestTemplate);
+        $requestsPath = app_path('Http/Requests');
+        File::ensureDirectoryExists($requestsPath);
+        File::put("$requestsPath/{$requestClass}.php", $requestTemplate);
         $this->info("Form Request for $modelName created successfully.");
+    }
+
+
+    protected function generateController($modelName)
+    {
+        $controllerTemplate = "<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\\$modelName;
+use App\Http\Requests\\{$modelName}Request;
+use Illuminate\Http\Request;
+
+class {$modelName}Controller extends Controller
+{
+    public function index()
+    {
+        return response()->json($modelName::all());
+    }
+
+    public function store({$modelName}Request \$request)
+    {
+        \$record = $modelName::create(\$request->validated());
+        return response()->json(\$record, 201);
+    }
+
+    public function show($modelName \$record)
+    {
+        return response()->json(\$record);
+    }
+
+    public function update({$modelName}Request \$request, $modelName \$record)
+    {
+        \$record->update(\$request->validated());
+        return response()->json(\$record);
+    }
+
+    public function destroy($modelName \$record)
+    {
+        \$record->delete();
+        return response()->json(null, 204);
+    }
+}";
+
+        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
+        $this->info("Controller for $modelName created successfully.");
     }
 
 
