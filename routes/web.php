@@ -6,36 +6,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::resource('projects', ProjectController::class);
 
-Route::resource('projects', ProjectController::class);
 
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
-Route::resource('projects', ProjectController::class);
-
+use App\Http\Controllers\ProjectController;
 Route::resource('projects', ProjectController::class);

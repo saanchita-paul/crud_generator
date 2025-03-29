@@ -39,13 +39,10 @@ class MakeCrud extends Command
 
         foreach ($fieldsArray as $field) {
             $fieldParts = explode(':', trim($field));
-
-            // Ensure valid field definition
             if (count($fieldParts) < 2) {
                 $this->error("Invalid field definition: $field");
                 continue;
             }
-
             $fillableFields[] = "'" . $fieldParts[0] . "'";
         }
 
@@ -55,26 +52,27 @@ class MakeCrud extends Command
         if (!empty($relations)) {
             foreach (explode(',', $relations) as $relation) {
                 $relationParts = explode(':', trim($relation));
-
-                // Ensure relation definition is valid
                 if (count($relationParts) < 2) {
                     $this->error("Invalid relation definition: $relation");
                     continue;
                 }
 
                 [$relatedModel, $type] = $relationParts;
-                $relatedModel = Str::studly($relatedModel);
+                $relatedModelStudly = Str::studly(Str::singular($relatedModel));
 
                 if ($type === 'hasMany') {
-                    $relationsCode .= "\n    public function " . Str::camel(Str::plural($relatedModel)) . "() {\n";
-                    $relationsCode .= "        return \$this->hasMany($relatedModel::class);\n";
+                    $relationsCode .= "\n    public function " . Str::camel(Str::plural($relatedModelStudly)) . "() {\n";
+                    $relationsCode .= "        return \$this->hasMany($relatedModelStudly::class);\n";
                     $relationsCode .= "    }\n";
+
+                    // Generate the related model automatically
+                    $this->generateModel($relatedModelStudly, 'title:string,description:text,status:string', "$modelName:belongsTo");
                 } elseif ($type === 'belongsTo') {
-                    $relationsCode .= "\n    public function " . Str::camel($relatedModel) . "() {\n";
-                    $relationsCode .= "        return \$this->belongsTo($relatedModel::class);\n";
+                    $relationsCode .= "\n    public function " . Str::camel($relatedModelStudly) . "() {\n";
+                    $relationsCode .= "        return \$this->belongsTo($relatedModelStudly::class);\n";
                     $relationsCode .= "    }\n";
                 } else {
-                    $this->error("Invalid relation type: $type for $relatedModel");
+                    $this->error("Invalid relation type: $type for $relatedModelStudly");
                 }
             }
         }
@@ -205,7 +203,7 @@ return new class extends Migration {
                         $validationRules .= "'$name' => 'nullable|string',\n            ";
                         break;
                     default:
-                        $validationRules .= "'$name' => 'required',\n            ";
+                        $validationRules .= "'$name' => 'required|in:open,closed',\n            ";
                 }
             }
         }
@@ -247,7 +245,7 @@ class {$modelName}Controller extends Controller
 {
     public function index()
     {
-        return response()->json($modelName::all());
+        return $modelName::all();
     }
 
     public function store({$modelName}Request \$request)
@@ -279,18 +277,78 @@ class {$modelName}Controller extends Controller
     }
 
 
-    protected function generateRoutes($modelName)
+    protected function generateRoutes($modelName, $relations = [])
     {
         $controller = "{$modelName}Controller";
+        $modelSnakePlural = Str::snake(Str::plural($modelName));
+        $controllerNamespace = "App\Http\Controllers\\$controller";
 
-        $apiRoute = "Route::apiResource('" . Str::snake(Str::plural($modelName)) . "', $controller::class);";
-        File::append(base_path('routes/api.php'), "\n$apiRoute\n");
+        // Ensure the `web.php` and `api.php` files have `<?php` and proper imports
+        $this->ensureRouteFile(base_path('routes/web.php'));
+        $this->ensureRouteFile(base_path('routes/api.php'));
 
-        $webRoute = "Route::resource('" . Str::snake(Str::plural($modelName)) . "', $controller::class);";
-        File::append(base_path('routes/web.php'), "\n$webRoute\n");
+        // Append resource routes
+        $this->appendRoute(base_path('routes/web.php'), "use $controllerNamespace;\nRoute::resource('$modelSnakePlural', $controller::class);");
+        $this->appendRoute(base_path('routes/api.php'), "use $controllerNamespace;\nRoute::apiResource('$modelSnakePlural', $controller::class);");
 
         $this->info("Routes for $modelName added successfully.");
+
+        // Handle nested resource routes for hasMany relationships
+        if (!empty($relations)) {
+            foreach ($relations as $relation) {
+                $relationParts = explode(':', trim($relation));
+
+                if (count($relationParts) < 2) {
+                    continue;
+                }
+
+                [$relatedModel, $type] = $relationParts;
+                $relatedModel = Str::studly(Str::singular($relatedModel)); // Ensure singular model name
+                $relatedModelPlural = Str::snake(Str::plural($relatedModel)); // Plural snake-case for route
+                $relatedController = "{$relatedModel}Controller";
+                $relatedControllerNamespace = "App\Http\Controllers\\$relatedController";
+
+                if ($type === 'hasMany') {
+                    $nestedWebRoute = "use $relatedControllerNamespace;\nRoute::resource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
+                    $nestedApiRoute = "use $relatedControllerNamespace;\nRoute::apiResource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
+
+                    $this->appendRoute(base_path('routes/web.php'), $nestedWebRoute);
+                    $this->appendRoute(base_path('routes/api.php'), $nestedApiRoute);
+
+                    $this->info("Nested routes for $relatedModel under $modelName added successfully.");
+                }
+            }
+        }
     }
+
+    /**
+     * Ensure that the route file starts with `<?php`
+     */
+    protected function ensureRouteFile($filePath)
+    {
+        if (!file_exists($filePath)) {
+            File::put($filePath, "<?php\n\n");
+        } else {
+            $contents = File::get($filePath);
+            if (!str_starts_with(trim($contents), '<?php')) {
+                File::put($filePath, "<?php\n\n" . $contents);
+            }
+        }
+    }
+
+    /**
+     * Append a route while ensuring duplicate imports are not added
+     */
+    protected function appendRoute($filePath, $routeCode)
+    {
+        $contents = File::get($filePath);
+
+        // Avoid duplicate imports or routes
+        if (!str_contains($contents, $routeCode)) {
+            File::append($filePath, "\n$routeCode\n");
+        }
+    }
+
 
 
     protected function generateViews($modelName)
