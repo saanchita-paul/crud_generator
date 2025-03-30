@@ -101,54 +101,62 @@ class $modelName extends Model
 
     protected function generateMigration($modelName, $fields)
     {
-        $tableName = Str::snake(Str::plural($modelName));
-        $migrationName = 'create_' . $tableName . '_table';
-        $timestamp = now()->format('Y_m_d_His');
-        $migrationFile = database_path("migrations/{$timestamp}_{$migrationName}.php");
+        $tableNames = [Str::snake(Str::plural($modelName)), 'tasks'];
+        foreach ($tableNames as $tableName) {
+            $migrationName = 'create_' . $tableName . '_table';
+            $timestamp = now()->format('Y_m_d_His');
+            $migrationFile = database_path("migrations/{$timestamp}_{$migrationName}.php");
 
-        $schemaFields = '';
-        foreach (explode(',', $fields) as $field) {
-            $field = trim($field);
-
-            // Handle the case where field type contains colons (like enum values)
-            $firstColonPos = strpos($field, ':');
-            if ($firstColonPos === false) {
-                $this->error("Invalid field definition: $field");
-                continue;
+            // Ensure migrations directory exists
+            if (!File::exists(database_path('migrations'))) {
+                File::makeDirectory(database_path('migrations'), 0755, true);
             }
 
-            $name = substr($field, 0, $firstColonPos);
-            $typeDefinition = substr($field, $firstColonPos + 1);
+            $schemaFields = '';
+            foreach (explode(',', $fields) as $field) {
+                $field = trim($field);
 
-            // Handle enum fields
-            if (str_starts_with($typeDefinition, 'enum(')) {
-                $enumValues = substr($typeDefinition, 5, -1); // Remove 'enum(' and ')'
-                $values = array_map(function($value) {
-                    return "'" . trim($value, " '\"") . "'"; // Trim spaces and quotes
-                }, explode(',', $enumValues));
+                $firstColonPos = strpos($field, ':');
+                if ($firstColonPos === false) {
+                    $this->error("Invalid field definition: $field");
+                    continue;
+                }
 
-                $valuesString = implode(', ', $values);
-                $schemaFields .= "\$table->enum('$name', [$valuesString]);\n            ";
-            } else {
-                // Handle regular field types
-                switch ($typeDefinition) {
-                    case 'string':
-                        $schemaFields .= "\$table->string('$name');\n            ";
-                        break;
-                    case 'text':
-                        $schemaFields .= "\$table->text('$name');\n            ";
-                        break;
-                    default:
-                        $schemaFields .= "\$table->$typeDefinition('$name');\n            ";
+                $name = substr($field, 0, $firstColonPos);
+                $typeDefinition = substr($field, $firstColonPos + 1);
+
+                // Handle status field explicitly
+                if ($name === 'status') {
+                    $schemaFields .= "\$table->enum('status', ['open', 'closed']);\n            ";
+                    continue;
+                }
+
+                // Handle enum fields
+                if (str_starts_with($typeDefinition, 'enum(')) {
+                    $enumValues = substr($typeDefinition, 5, -1); // Remove 'enum(' and ')'
+                    $values = array_map(fn($value) => "'" . trim($value, " '") . "'", explode(',', $enumValues));
+                    $valuesString = implode(', ', $values);
+                    $schemaFields .= "\$table->enum('$name', [$valuesString]);\n            ";
+                } else {
+                    // Handle regular field types
+                    switch ($typeDefinition) {
+                        case 'string':
+                            $schemaFields .= "\$table->string('$name');\n            ";
+                            break;
+                        case 'text':
+                            $schemaFields .= "\$table->text('$name');\n            ";
+                            break;
+                        default:
+                            $schemaFields .= "\$table->$typeDefinition('$name');\n            ";
+                    }
                 }
             }
-        }
 
-        $migrationTemplate = "<?php
+            $migrationTemplate = "<?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
 
 return new class extends Migration {
     public function up()
@@ -166,8 +174,9 @@ return new class extends Migration {
     }
 };";
 
-        File::put($migrationFile, $migrationTemplate);
-        $this->info("Migration for $modelName created successfully.");
+            File::put($migrationFile, $migrationTemplate);
+            $this->info("Migration for $tableName created successfully.");
+        }
     }
 
 
