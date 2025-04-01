@@ -83,12 +83,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class $modelName extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected \$fillable = [$fillableString];
+    protected \$dates = ['deleted_at'];
 
     $relationsCode
 }";
@@ -139,16 +141,11 @@ class $modelName extends Model
                     $schemaFields .= "\$table->enum('$name', [$valuesString]);\n            ";
                 } else {
                     // Handle regular field types
-                    switch ($typeDefinition) {
-                        case 'string':
-                            $schemaFields .= "\$table->string('$name');\n            ";
-                            break;
-                        case 'text':
-                            $schemaFields .= "\$table->text('$name');\n            ";
-                            break;
-                        default:
-                            $schemaFields .= "\$table->$typeDefinition('$name');\n            ";
-                    }
+                    $schemaFields .= match ($typeDefinition) {
+                        'string' => "\$table->string('$name');\n            ",
+                        'text' => "\$table->text('$name');\n            ",
+                        default => "\$table->$typeDefinition('$name');\n            ",
+                    };
                 }
             }
 
@@ -164,6 +161,7 @@ return new class extends Migration {
         Schema::create('$tableName', function (Blueprint \$table) {
             \$table->id();
             $schemaFields
+            \$table->softDeletes();
             \$table->timestamps();
         });
     }
