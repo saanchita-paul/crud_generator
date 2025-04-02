@@ -1,8 +1,5 @@
 <?php
 
 
-use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\Api\ProjectController;
 Route::apiResource('projects', ProjectController::class);
-
-use App\Http\Controllers\SubheaderController;
-Route::apiResource('subheaders', SubheaderController::class);

@@ -24,10 +24,13 @@ class MakeCrud extends Command
 
         $this->generateModel($modelName, $fields, $relations);
         $this->generateMigration($modelName, $fields);
-        $this->generateController($modelName);
+//        $this->generateController($modelName);
+        $this->generateApiController($modelName);
+        $this->generateWebController($modelName);
         $this->generateRequest($modelName);
         $this->generateRoutes($modelName);
         $this->generateViews($modelName);
+        $this->generateLayout();
 
         $this->info("CRUD generation for $modelName completed successfully!");
     }
@@ -143,7 +146,7 @@ class $modelName extends Model
                     // Handle regular field types
                     $schemaFields .= match ($typeDefinition) {
                         'string' => "\$table->string('$name');\n            ",
-                        'text' => "\$table->text('$name');\n            ",
+                        'text' => "\$table->text('$name')->nullable();\n            ",
                         default => "\$table->$typeDefinition('$name');\n            ",
                     };
                 }
@@ -223,6 +226,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class $requestClass extends FormRequest
 {
+    public function authorize()
+    {
+        return true;
+    }
     public function rules()
     {
         return [
@@ -238,21 +245,67 @@ class $requestClass extends FormRequest
     }
 
 
-    protected function generateController($modelName)
+//    protected function generateController($modelName)
+//    {
+//        $controllerTemplate = "<?php
+//
+//namespace App\Http\Controllers;
+//
+//use App\Models\\$modelName;
+//use App\Http\Requests\\{$modelName}Request;
+//use Illuminate\Http\Request;
+//
+//class {$modelName}Controller extends Controller
+//{
+//    public function index()
+//    {
+//        return $modelName::all();
+//    }
+//
+//    public function store({$modelName}Request \$request)
+//    {
+//        \$record = $modelName::create(\$request->validated());
+//        return response()->json(\$record, 201);
+//    }
+//
+//    public function show($modelName \$record)
+//    {
+//        return response()->json(\$record);
+//    }
+//
+//    public function update({$modelName}Request \$request, $modelName \$record)
+//    {
+//        \$record->update(\$request->validated());
+//        return response()->json(\$record);
+//    }
+//
+//    public function destroy($modelName \$record)
+//    {
+//        \$record->delete();
+//        return response()->json(null, 204);
+//    }
+//}";
+//
+//        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
+//        $this->info("Controller for $modelName created successfully.");
+//    }
+
+    protected function generateApiController($modelName)
     {
         $controllerTemplate = "<?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
 use App\Models\\$modelName;
 use App\Http\Requests\\{$modelName}Request;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 
 class {$modelName}Controller extends Controller
 {
     public function index()
     {
-        return $modelName::all();
+        return response()->json($modelName::all());
     }
 
     public function store({$modelName}Request \$request)
@@ -279,24 +332,134 @@ class {$modelName}Controller extends Controller
     }
 }";
 
-        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
-        $this->info("Controller for $modelName created successfully.");
+        File::ensureDirectoryExists(app_path('Http/Controllers/Api'));
+        File::put(app_path("Http/Controllers/Api/{$modelName}Controller.php"), $controllerTemplate);
+        $this->info("API Controller for $modelName created successfully.");
     }
 
+//    protected function generateWebController($modelName)
+//    {
+//        $pluralModelName = Str::plural(Str::snake($modelName));
+//        $controllerTemplate = "<?php
+//
+//namespace App\Http\Controllers;
+//
+//use App\Models\\$modelName;
+//use App\Http\Requests\\{$modelName}Request;
+//use Illuminate\Http\Request;
+//
+//class {$modelName}Controller extends Controller
+//{
+//    public function index()
+//    {
+//        return view('$pluralModelName.index', ['projects' => $modelName::all()]);
+//    }
+//
+//    public function create()
+//    {
+//        return view('$pluralModelName.create');
+//    }
+//
+//    public function store({$modelName}Request \$request)
+//    {
+//        $modelName::create(\$request->validated());
+//        return redirect()->route('$pluralModelName.index');
+//    }
+//
+//    public function edit($modelName \$record)
+//    {
+//        return view('$pluralModelName.edit', compact('record'));
+//    }
+//
+//    public function update({$modelName}Request \$request, $modelName \$record)
+//    {
+//        \$record->update(\$request->validated());
+//        return redirect()->route('$pluralModelName.index');
+//    }
+//
+//    public function destroy($modelName \$record)
+//    {
+//        \$record->delete();
+//        return redirect()->route('$pluralModelName.index');
+//    }
+//}";
+//
+//        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
+//        $this->info("Web Controller for $modelName created successfully.");
+//    }
+
+    protected function generateWebController($modelName)
+    {
+        $pluralModelName = Str::plural(Str::snake($modelName));
+        $variableName = Str::camel($modelName);
+
+        $controllerTemplate = "<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\\$modelName;
+use App\Http\Requests\\{$modelName}Request;
+use Illuminate\Http\Request;
+
+class {$modelName}Controller extends Controller
+{
+    public function index()
+    {
+        return view('$pluralModelName.index', ['$pluralModelName' => $modelName::all()]);
+    }
+
+    public function create()
+    {
+        return view('$pluralModelName.create');
+    }
+
+    public function store({$modelName}Request \$request)
+    {
+        \${$variableName} = $modelName::create(\$request->validated());
+        return redirect()->route('$pluralModelName.index');
+    }
+
+     public function show($modelName \${$variableName})
+    {
+        return view('$pluralModelName.show', compact('$variableName'));
+    }
+
+    public function edit($modelName \${$variableName})
+    {
+        return view('$pluralModelName.edit', compact('$variableName'));
+    }
+
+    public function update({$modelName}Request \$request, $modelName \${$variableName})
+    {
+        \${$variableName}->update(\$request->validated());
+        return redirect()->route('$pluralModelName.index');
+    }
+
+    public function destroy($modelName \${$variableName})
+    {
+        \${$variableName}->delete();
+        return redirect()->route('$pluralModelName.index');
+    }
+}";
+
+        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
+        $this->info("Web Controller for $modelName created successfully.");
+    }
 
     protected function generateRoutes($modelName, $relations = [])
     {
         $controller = "{$modelName}Controller";
         $modelSnakePlural = Str::snake(Str::plural($modelName));
-        $controllerNamespace = "App\Http\Controllers\\$controller";
+        $webControllerNamespace = "App\Http\Controllers\\$controller";
+        $apiControllerNamespace = "App\Http\Controllers\Api\\$controller";
 
         // Ensure the `web.php` and `api.php` files have `<?php` and proper imports
         $this->ensureRouteFile(base_path('routes/web.php'));
         $this->ensureRouteFile(base_path('routes/api.php'));
 
         // Append resource routes
-        $this->appendRoute(base_path('routes/web.php'), "use $controllerNamespace;\nRoute::resource('$modelSnakePlural', $controller::class);");
-        $this->appendRoute(base_path('routes/api.php'), "use $controllerNamespace;\nRoute::apiResource('$modelSnakePlural', $controller::class);");
+        $this->appendRoute(base_path('routes/web.php'), "use $webControllerNamespace;\nRoute::resource('$modelSnakePlural', $controller::class);");
+        $this->appendRoute(base_path('routes/api.php'), "use $apiControllerNamespace;\nRoute::apiResource('$modelSnakePlural', $controller::class);");
 
         $this->info("Routes for $modelName added successfully.");
 
@@ -313,11 +476,12 @@ class {$modelName}Controller extends Controller
                 $relatedModel = Str::studly(Str::singular($relatedModel)); // Ensure singular model name
                 $relatedModelPlural = Str::snake(Str::plural($relatedModel)); // Plural snake-case for route
                 $relatedController = "{$relatedModel}Controller";
-                $relatedControllerNamespace = "App\Http\Controllers\\$relatedController";
+                $webRelatedControllerNamespace = "App\Http\Controllers\\$relatedController";
+                $apiRelatedControllerNamespace = "App\Http\Controllers\Api\\$relatedController";
 
                 if ($type === 'hasMany') {
-                    $nestedWebRoute = "use $relatedControllerNamespace;\nRoute::resource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
-                    $nestedApiRoute = "use $relatedControllerNamespace;\nRoute::apiResource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
+                    $nestedWebRoute = "use $webRelatedControllerNamespace;\nRoute::resource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
+                    $nestedApiRoute = "use $apiRelatedControllerNamespace;\nRoute::apiResource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
 
                     $this->appendRoute(base_path('routes/web.php'), $nestedWebRoute);
                     $this->appendRoute(base_path('routes/api.php'), $nestedApiRoute);
@@ -417,6 +581,29 @@ class {$modelName}Controller extends Controller
         File::put("$folderPath/show.blade.php", $showTemplate);
 
         $this->info("Views for $modelName created successfully.");
+    }
+
+    protected function generateLayout()
+    {
+        $layoutTemplate = "<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>{{ config('app.name') }}</title>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\">
+</head>
+<body>
+    <div class=\"container mt-5\">
+        @yield('content')
+    </div>
+</body>
+</html>";
+
+        $viewsPath = resource_path('views/layouts');
+        File::ensureDirectoryExists($viewsPath);
+        File::put("$viewsPath/layout.blade.php", $layoutTemplate);
+        $this->info("Reusable layout created successfully.");
     }
 
 }
