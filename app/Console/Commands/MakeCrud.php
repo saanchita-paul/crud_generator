@@ -292,6 +292,7 @@ class $requestClass extends FormRequest
 
     protected function generateApiController($modelName)
     {
+        $variableName = Str::camel($modelName);
         $controllerTemplate = "<?php
 
 namespace App\Http\Controllers\Api;
@@ -310,24 +311,25 @@ class {$modelName}Controller extends Controller
 
     public function store({$modelName}Request \$request)
     {
-        \$record = $modelName::create(\$request->validated());
-        return response()->json(\$record, 201);
+        \${$variableName} = $modelName::create(\$request->validated());
+        return response()->json(\${$variableName}, 201);
+
     }
 
-    public function show($modelName \$record)
+    public function show($modelName \${$variableName})
     {
-        return response()->json(\$record);
+       return response()->json(\${$variableName});
     }
 
-    public function update({$modelName}Request \$request, $modelName \$record)
+    public function update({$modelName}Request \$request, $modelName \${$variableName})
     {
-        \$record->update(\$request->validated());
-        return response()->json(\$record);
+        \${$variableName}->update(\$request->validated());
+        return response()->json(\${$variableName});
     }
 
-    public function destroy($modelName \$record)
+    public function destroy($modelName \${$variableName})
     {
-        \$record->delete();
+         \${$variableName}->delete();
         return response()->json(null, 204);
     }
 }";
