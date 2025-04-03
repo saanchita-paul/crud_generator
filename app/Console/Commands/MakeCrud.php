@@ -22,6 +22,8 @@ class MakeCrud extends Command
 
         $this->info("Generating CRUD for model: $modelName...");
 
+        $fieldsArray = $fields ? explode(',', $fields) : [];
+
         $this->generateModel($modelName, $fields, $relations);
         $this->generateMigration($modelName, $fields);
 //        $this->generateController($modelName);
@@ -29,7 +31,7 @@ class MakeCrud extends Command
         $this->generateWebController($modelName);
         $this->generateRequest($modelName);
         $this->generateRoutes($modelName);
-        $this->generateViews($modelName);
+        $this->generateViews($modelName, $fieldsArray);
         $this->generateLayout();
 
         $this->info("CRUD generation for $modelName completed successfully!");
@@ -245,53 +247,9 @@ class $requestClass extends FormRequest
     }
 
 
-//    protected function generateController($modelName)
-//    {
-//        $controllerTemplate = "<?php
-//
-//namespace App\Http\Controllers;
-//
-//use App\Models\\$modelName;
-//use App\Http\Requests\\{$modelName}Request;
-//use Illuminate\Http\Request;
-//
-//class {$modelName}Controller extends Controller
-//{
-//    public function index()
-//    {
-//        return $modelName::all();
-//    }
-//
-//    public function store({$modelName}Request \$request)
-//    {
-//        \$record = $modelName::create(\$request->validated());
-//        return response()->json(\$record, 201);
-//    }
-//
-//    public function show($modelName \$record)
-//    {
-//        return response()->json(\$record);
-//    }
-//
-//    public function update({$modelName}Request \$request, $modelName \$record)
-//    {
-//        \$record->update(\$request->validated());
-//        return response()->json(\$record);
-//    }
-//
-//    public function destroy($modelName \$record)
-//    {
-//        \$record->delete();
-//        return response()->json(null, 204);
-//    }
-//}";
-//
-//        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
-//        $this->info("Controller for $modelName created successfully.");
-//    }
-
     protected function generateApiController($modelName)
     {
+        $variableName = Str::camel($modelName);
         $controllerTemplate = "<?php
 
 namespace App\Http\Controllers\Api;
@@ -310,24 +268,25 @@ class {$modelName}Controller extends Controller
 
     public function store({$modelName}Request \$request)
     {
-        \$record = $modelName::create(\$request->validated());
-        return response()->json(\$record, 201);
+        \${$variableName} = $modelName::create(\$request->validated());
+        return response()->json(\${$variableName}, 201);
+
     }
 
-    public function show($modelName \$record)
+    public function show($modelName \${$variableName})
     {
-        return response()->json(\$record);
+       return response()->json(\${$variableName});
     }
 
-    public function update({$modelName}Request \$request, $modelName \$record)
+    public function update({$modelName}Request \$request, $modelName \${$variableName})
     {
-        \$record->update(\$request->validated());
-        return response()->json(\$record);
+        \${$variableName}->update(\$request->validated());
+        return response()->json(\${$variableName});
     }
 
-    public function destroy($modelName \$record)
+    public function destroy($modelName \${$variableName})
     {
-        \$record->delete();
+         \${$variableName}->delete();
         return response()->json(null, 204);
     }
 }";
@@ -336,57 +295,6 @@ class {$modelName}Controller extends Controller
         File::put(app_path("Http/Controllers/Api/{$modelName}Controller.php"), $controllerTemplate);
         $this->info("API Controller for $modelName created successfully.");
     }
-
-//    protected function generateWebController($modelName)
-//    {
-//        $pluralModelName = Str::plural(Str::snake($modelName));
-//        $controllerTemplate = "<?php
-//
-//namespace App\Http\Controllers;
-//
-//use App\Models\\$modelName;
-//use App\Http\Requests\\{$modelName}Request;
-//use Illuminate\Http\Request;
-//
-//class {$modelName}Controller extends Controller
-//{
-//    public function index()
-//    {
-//        return view('$pluralModelName.index', ['projects' => $modelName::all()]);
-//    }
-//
-//    public function create()
-//    {
-//        return view('$pluralModelName.create');
-//    }
-//
-//    public function store({$modelName}Request \$request)
-//    {
-//        $modelName::create(\$request->validated());
-//        return redirect()->route('$pluralModelName.index');
-//    }
-//
-//    public function edit($modelName \$record)
-//    {
-//        return view('$pluralModelName.edit', compact('record'));
-//    }
-//
-//    public function update({$modelName}Request \$request, $modelName \$record)
-//    {
-//        \$record->update(\$request->validated());
-//        return redirect()->route('$pluralModelName.index');
-//    }
-//
-//    public function destroy($modelName \$record)
-//    {
-//        \$record->delete();
-//        return redirect()->route('$pluralModelName.index');
-//    }
-//}";
-//
-//        File::put(app_path("Http/Controllers/{$modelName}Controller.php"), $controllerTemplate);
-//        $this->info("Web Controller for $modelName created successfully.");
-//    }
 
     protected function generateWebController($modelName)
     {
@@ -521,63 +429,106 @@ class {$modelName}Controller extends Controller
     }
 
 
-
-    protected function generateViews($modelName)
+    protected function generateViews($modelName, $fields)
     {
         $folderPath = resource_path("views/" . Str::snake(Str::plural($modelName)));
         File::ensureDirectoryExists($folderPath);
 
-        $indexTemplate = "<x-layout>
-    <div class='container'>
-        <table>
-            @foreach (\$" . Str::snake(Str::plural($modelName)) . " as \$record)
+        $variableName = Str::snake($modelName);
+        $collectionVariable = Str::snake(Str::plural($modelName));
+
+        $fieldHeaders = "";
+        $fieldRows = "";
+        $formFields = "";
+        $showFields = "";
+
+        foreach ($fields as $field) {
+            // Extract actual field name without type annotations
+            $fieldParts = explode(':', $field);
+            $fieldName = $fieldParts[0]; // Get field name (ignoring type)
+
+            $fieldHeaders .= "                    <th>" . ucfirst($fieldName) . "</th>\n";
+            $fieldRows .= "                        <td>{{ \${$variableName}->$fieldName }}</td>\n";
+
+            $formFields .= "            <div class='mb-3'>\n";
+            $formFields .= "                <label class='form-label'>" . ucfirst($fieldName) . "</label>\n";
+            $formFields .= "                <input class='form-control' type='text' name='$fieldName' value='{{ old('$fieldName', \${$variableName}->$fieldName ?? '') }}'>\n";
+            $formFields .= "            </div>\n";
+
+            $showFields .= "        <p><strong>" . ucfirst($fieldName) . ":</strong> {{ \${$variableName}->$fieldName }}</p>\n";
+        }
+
+        // Index Blade File
+        $indexTemplate = "@extends('layouts.app')
+
+@section('content')
+    <div class='container mt-4'>
+        <h2 class='mb-4'>" . Str::plural($modelName) . " List</h2>
+        <table class='table table-bordered table-striped'>
+            <thead class='thead-dark'>
                 <tr>
-                    <td>{{ \$record->name }}</td>
-                    <td>{{ \$record->status }}</td>
-                    <td>
-                        <a href='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".edit\", \$record) }}'>Edit</a>
-                        <form action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".destroy\", \$record) }}' method='POST'>
-                            @csrf
-                            @method('DELETE')
-                            <button type='submit'>Delete</button>
-                        </form>
-                    </td>
+$fieldHeaders
+                    <th>Actions</th>
                 </tr>
-            @endforeach
+            </thead>
+            <tbody>
+                @foreach (\$$collectionVariable as \$$variableName)
+                    <tr>
+$fieldRows
+                        <td>
+                            <a href='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".show\", \$$variableName) }}' class='btn btn-sm btn-info'>View</a>
+                            <a href='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".edit\", \$$variableName) }}' class='btn btn-sm btn-primary'>Edit</a>
+                            <form action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".destroy\", \$$variableName) }}' method='POST' class='d-inline'>
+                                @csrf
+                                @method('DELETE')
+                                <button type='submit' class='btn btn-sm btn-danger' onclick='return confirm(\"Are you sure?\")'>Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
         </table>
     </div>
-</x-layout>";
-
+@endsection";
         File::put("$folderPath/index.blade.php", $indexTemplate);
 
-        $createTemplate = "<x-layout>
-    <form method='POST' action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".store\") }}'>
-        @csrf
-        <input type='text' name='name' placeholder='Enter Name'>
-        <button type='submit'>Save</button>
-    </form>
-</x-layout>";
+        // Create Blade File
+        $createTemplate = "@extends('layouts.app')
 
+@section('content')
+    <div class='container'>
+        <form class='form-control' method='POST' action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".store\") }}'>
+            @csrf
+$formFields
+            <button class='btn btn-primary mt-4' type='submit'>Save</button>
+        </form>
+    </div>
+@endsection";
         File::put("$folderPath/create.blade.php", $createTemplate);
 
-        $editTemplate = "<x-layout>
-    <form method='POST' action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".update\", \$record) }}'>
-        @csrf
-        @method('PUT')
-        <input type='text' name='name' value='{{ \$record->name }}'>
-        <button type='submit'>Update</button>
-    </form>
-</x-layout>";
+        // Edit Blade File
+        $editTemplate = "@extends('layouts.app')
 
+@section('content')
+    <div class='container'>
+        <form class='form-control' method='POST' action='{{ route(\"" . Str::snake(Str::plural($modelName)) . ".update\", \$$variableName) }}'>
+            @csrf
+            @method('PUT')
+$formFields
+            <button class='btn btn-primary mt-4' type='submit'>Update</button>
+        </form>
+    </div>
+@endsection";
         File::put("$folderPath/edit.blade.php", $editTemplate);
 
-        $showTemplate = "<x-layout>
-    <div>
-        <h2>{{ \$record->name }}</h2>
-        <p>{{ \$record->status }}</p>
-    </div>
-</x-layout>";
+        // Show Blade File
+        $showTemplate = "@extends('layouts.app')
 
+@section('content')
+    <div class='container'>
+$showFields
+    </div>
+@endsection";
         File::put("$folderPath/show.blade.php", $showTemplate);
 
         $this->info("Views for $modelName created successfully.");
