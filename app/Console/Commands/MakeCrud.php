@@ -111,6 +111,16 @@ class $modelName extends Model
         $tableNames = [Str::snake(Str::plural($modelName)), 'tasks'];
         foreach ($tableNames as $tableName) {
             $migrationName = 'create_' . $tableName . '_table';
+            // Check if migration already exists
+            $migrationPath = database_path('migrations');
+            $existingMigration = collect(File::files($migrationPath))
+                ->first(fn($file) => str_contains($file->getFilename(), $migrationName));
+
+            if ($existingMigration) {
+                $this->warn("Migration for table '$tableName' already exists: {$existingMigration->getFilename()}");
+                continue;
+            }
+
             $timestamp = now()->format('Y_m_d_His');
             $migrationFile = database_path("migrations/{$timestamp}_{$migrationName}.php");
 
@@ -443,18 +453,37 @@ class {$modelName}Controller extends Controller
         $showFields = "";
 
         foreach ($fields as $field) {
-            // Extract actual field name without type annotations
             $fieldParts = explode(':', $field);
-            $fieldName = $fieldParts[0]; // Get field name (ignoring type)
+            $fieldName = trim($fieldParts[0]);
+            $fieldType = isset($fieldParts[1]) ? trim($fieldParts[1]) : 'string';
+
+            if (!$fieldName || str_contains($fieldName, ')')) {
+                continue; // skip malformed fields
+            }
 
             $fieldHeaders .= "                    <th>" . ucfirst($fieldName) . "</th>\n";
             $fieldRows .= "                        <td>{{ \${$variableName}->$fieldName }}</td>\n";
 
+            // Generate form field
             $formFields .= "            <div class='mb-3'>\n";
             $formFields .= "                <label class='form-label'>" . ucfirst($fieldName) . "</label>\n";
-            $formFields .= "                <input class='form-control' type='text' name='$fieldName' value='{{ old('$fieldName', \${$variableName}->$fieldName ?? '') }}'>\n";
-            $formFields .= "            </div>\n";
 
+            if (str_starts_with($fieldType, 'enum(')) {
+                // Parse enum values
+                $enumValues = substr($fieldType, 5, -1); // remove 'enum(' and ')'
+                $values = array_map(fn($value) => trim($value, " '\""), explode(',', $enumValues));
+                $formFields .= "                <select class='form-control' name='$fieldName'>\n";
+                $formFields .= "                    @foreach(['" . implode("','", $values) . "'] as \$val)\n";
+                $formFields .= "                        <option value='{{ \$val }}' {{ old('$fieldName', \${$variableName}->$fieldName ?? '') == \$val ? 'selected' : '' }}>{{ ucfirst(\$val) }}</option>\n";
+                $formFields .= "                    @endforeach\n";
+                $formFields .= "                </select>\n";
+            } elseif ($fieldType === 'text') {
+                $formFields .= "                <textarea class='form-control' name='$fieldName'>{{ old('$fieldName', \${$variableName}->$fieldName ?? '') }}</textarea>\n";
+            } else {
+                $formFields .= "                <input class='form-control' type='text' name='$fieldName' value='{{ old('$fieldName', \${$variableName}->$fieldName ?? '') }}'>\n";
+            }
+
+            $formFields .= "            </div>\n";
             $showFields .= "        <p><strong>" . ucfirst($fieldName) . ":</strong> {{ \${$variableName}->$fieldName }}</p>\n";
         }
 
@@ -533,6 +562,7 @@ $showFields
 
         $this->info("Views for $modelName created successfully.");
     }
+
 
     protected function generateLayout()
     {
