@@ -22,7 +22,8 @@ class MakeCrud extends Command
 
         $this->info("Generating CRUD for model: $modelName...");
 
-        $fieldsArray = $fields ? explode(',', $fields) : [];
+        $fieldsInput = is_array($fields) ? implode(',', $fields) : $fields;
+
 
         $this->generateModel($modelName, $fields, $relations);
         $this->generateMigration($modelName, $fields);
@@ -31,15 +32,44 @@ class MakeCrud extends Command
         $this->generateWebController($modelName);
         $this->generateRequest($modelName);
         $this->generateRoutes($modelName);
-        $this->generateViews($modelName, $fieldsArray);
+        $this->generateViews($modelName, $fieldsInput);
         $this->generateLayout();
 
         $this->info("CRUD generation for $modelName completed successfully!");
     }
 
+    protected function parseFields(string $fields): array
+    {
+        $result = [];
+        $buffer = '';
+        $depth = 0;
+
+        for ($i = 0; $i < strlen($fields); $i++) {
+            $char = $fields[$i];
+
+            if ($char === ',' && $depth === 0) {
+                $result[] = trim($buffer);
+                $buffer = '';
+            } else {
+                if ($char === '(') {
+                    $depth++;
+                } elseif ($char === ')') {
+                    $depth--;
+                }
+                $buffer .= $char;
+            }
+        }
+
+        if (trim($buffer) !== '') {
+            $result[] = trim($buffer);
+        }
+
+        return $result;
+    }
+
     protected function generateModel($modelName, $fields, $relations)
     {
-        $fieldsArray = explode(',', $fields);
+        $fieldsArray =  $this->parseFields($fields);
         $fillableFields = [];
 
         foreach ($fieldsArray as $field) {
@@ -105,10 +135,25 @@ class $modelName extends Model
     }
 
 
-
     protected function generateMigration($modelName, $fields)
     {
-        $tableNames = [Str::snake(Str::plural($modelName)), 'tasks'];
+        $tableNames = [Str::snake(Str::plural($modelName))];
+
+        // Check if relations are provided
+        $relationsOption = $this->option('relations');
+        if ($relationsOption) {
+            $relations = is_array($relationsOption)
+                ? $relationsOption
+                : explode(',', $relationsOption);
+
+            foreach ($relations as $relation) {
+                [$relationName, $type] = array_map('trim', explode(':', $relation));
+                if ($relationName) {
+                    $tableNames[] = Str::snake(Str::plural($relationName));
+                }
+            }
+        }
+
         foreach ($tableNames as $tableName) {
             $migrationName = 'create_' . $tableName . '_table';
             // Check if migration already exists
@@ -130,7 +175,7 @@ class $modelName extends Model
             }
 
             $schemaFields = '';
-            foreach (explode(',', $fields) as $field) {
+            foreach ($this->parseFields($fields) as $field) {
                 $field = trim($field);
 
                 $firstColonPos = strpos($field, ':');
@@ -141,12 +186,6 @@ class $modelName extends Model
 
                 $name = substr($field, 0, $firstColonPos);
                 $typeDefinition = substr($field, $firstColonPos + 1);
-
-                // Handle status field explicitly
-                if ($name === 'status') {
-                    $schemaFields .= "\$table->enum('status', ['open', 'closed']);\n            ";
-                    continue;
-                }
 
                 // Handle enum fields
                 if (str_starts_with($typeDefinition, 'enum(')) {
@@ -196,10 +235,12 @@ return new class extends Migration {
     protected function generateRequest($modelName)
     {
         $requestClass = "{$modelName}Request";
-        $fields = $this->option('fields');
+        $fieldsOption = $this->option('fields');
+
+        $fields = is_array($fieldsOption) ? implode(',', $fieldsOption) : $fieldsOption;
 
         $validationRules = '';
-        foreach (explode(',', $fields) as $field) {
+        foreach ($this->parseFields($fields) as $field) {
             $field = trim($field);
             $fieldParts = explode(':', $field, 2); // Split only on first colon
 
@@ -213,8 +254,11 @@ return new class extends Migration {
             // Handle enum fields specially
             if (str_starts_with($type, 'enum(') && str_ends_with($type, ')')) {
                 $enumValues = str_replace(['enum(', ')'], '', $type);
-                $values = str_replace(',', ',', $enumValues); // Keep values as they are
-                $validationRules .= "'$name' => 'required|in:$values',\n            ";
+                $cleanValues = implode(',', array_map(
+                    fn($val) => trim($val, " '\""),
+                    explode(',', $enumValues)
+                ));
+                $validationRules .= "'$name' => 'required|in:$cleanValues',\n            ";
             } else {
                 // Handle regular field types
                 switch ($type) {
@@ -224,8 +268,14 @@ return new class extends Migration {
                     case 'text':
                         $validationRules .= "'$name' => 'nullable|string',\n            ";
                         break;
+                    case 'integer':
+                        $validationRules .= "'$name' => 'required|integer',\n            ";
+                        break;
+                    case 'boolean':
+                        $validationRules .= "'$name' => 'required|boolean',\n            ";
+                        break;
                     default:
-                        $validationRules .= "'$name' => 'required|in:open,closed',\n            ";
+                        $validationRules .= "'$name' => 'required|string',\n            ";
                 }
             }
         }
@@ -452,7 +502,7 @@ class {$modelName}Controller extends Controller
         $formFields = "";
         $showFields = "";
 
-        foreach ($fields as $field) {
+        foreach ($this->parseFields($fields) as $field) {
             $fieldParts = explode(':', $field);
             $fieldName = trim($fieldParts[0]);
             $fieldType = isset($fieldParts[1]) ? trim($fieldParts[1]) : 'string';
