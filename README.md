@@ -89,10 +89,12 @@ A default admin user is seeded for quick access to the web panel:
 Email: admin@example.com
 Password: password
 ```
--You can log in from both web and API interfaces.
--New users can register via:
+- You can log in from both web and API interfaces.
+- New users can register via:
+```
 -Web: /register
 -API: /api/register
+```
 
 **Note: While an admin user is seeded for convenience, the system supports standard user registration through both web and API routes.**
 
@@ -135,7 +137,7 @@ This will generate:
 - If --relations provided: Related model/controller/migration + nested routes
 
 
-- Visit [localhost](http://localhost:8000) in your web browser to use the application.
+Visit [localhost](http://localhost:8000) in your web browser to use the application.
 
 
 
