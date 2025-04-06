@@ -1,66 +1,147 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+## Laravel CRUD Generator
+A custom Laravel CRUD Generator that allows developers to scaffold complete resource management (models, controllers, requests, views, and routes) using a single artisan command. Designed for flexibility, scalability, and ease of use, this tool helps you quickly bootstrap fully functional CRUD modules with relationship support.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
 
-## About Laravel
+## Feature
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Generate models, migrations, controllers, requests, and views via a single command
+- Support for **hasMany** relationships
+- API routes with Sanctum authentication
+- Blade view generation with reusable components
+- Nested resource route generation (both API and web)
+- Organized blueprint services for maintainability
+- Automatic duplicate prevention in route imports and declarations
+- Reset command to clean up only generated files
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## File Structure
 
-## Learning Laravel
+Generator logic is modularized in the App\Services\CrudGenerator directory, with responsibilities split into:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- ModelGenerator
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- MigrationGenerator
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- ApiControllerGenerator
 
-## Laravel Sponsors
+- WebControllerGenerator
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- RequestGenerator
 
-### Premium Partners
+- ViewsGenerator
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+- RoutesGenerator
 
-## Contributing
+Each class is responsible for generating or cleaning up specific parts of the Laravel resource.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-## Code of Conduct
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Installation
 
-## Security Vulnerabilities
+To set up the CRUD Generator on your local machine, follow these steps:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Clone the repository using the following command:
 
-## License
+```
+https://github.com/saanchita-paul/crud_generator.git
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Navigate to the cloned directory:
+
+```
+cd crud_generator
+```
+- Install dependencies:
+
+```
+composer install
+```
+
+- Copy the .env.example file to .env:
+
+```
+cp .env.example .env
+```
+- Generate an application key:
+
+```
+php artisan key:generate
+```
+
+- Configure the database in the .env file:
+
+```
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_username
+DB_PASSWORD=your_database_password
+```
+- Migrate the database:
+
+```markdown
+php artisan migrate
+```
+# Authentication
+A default admin user is seeded for quick access to the web panel:
+```
+Email: admin@example.com
+Password: password
+```
+-You can log in from both web and API interfaces.
+-New users can register via:
+-Web: /register
+-API: /api/register
+
+**Note: While an admin user is seeded for convenience, the system supports standard user registration through both web and API routes.**
+
+- Run the following command to seed the database:
+
+```
+php artisan db:seed
+```
+
+- Start the development server:
+
+```
+php artisan serve
+```
+
+## Usage
+Run the artisan command without relation:
+```
+php artisan make:crud Project --fields="name:string, description:text, status:enum(open,closed)"
+```
+Run the artisan command wit relation:
+```
+php artisan make:crud Project --fields="name:string, description:text, status:enum(open,closed)" --relations="tasks:hasMany"
+```
+
+This will generate:
+
+- Project model with proper fillable attributes and relationship
+
+- Migration file with all fields and types
+
+- Form Request (ProjectRequest) with validation rules
+
+- RESTful Controller (ProjectController) with all resource methods
+
+- API and web routes
+
+- Blade views (index, create, edit, show) using components
+
+- If --relations provided: Related model/controller/migration + nested routes
+
+
+- Visit [localhost](http://localhost:8000) in your web browser to use the application.
+
+
+
+
+
+
+
+
+[Check Postman API Documentation](https://documenter.getpostman.com/view/15919922/2sB2cUCP3W)
