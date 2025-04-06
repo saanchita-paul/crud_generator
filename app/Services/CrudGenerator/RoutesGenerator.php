@@ -19,7 +19,11 @@ class RoutesGenerator
 
         // Append resource routes
         $this->appendRoute(base_path('routes/web.php'), "use $webControllerNamespace;\nRoute::resource('$modelSnakePlural', $controller::class);");
-        $this->appendRoute(base_path('routes/api.php'), "use $apiControllerNamespace;\nRoute::apiResource('$modelSnakePlural', $controller::class);");
+
+        $this->appendRoute(base_path('routes/api.php'), [
+            "use $apiControllerNamespace;",
+            "Route::middleware('auth:sanctum')->apiResource('$modelSnakePlural', $controller::class);"
+        ]);
 
         $command->info("Routes for $modelName added successfully.");
 
@@ -45,7 +49,11 @@ class RoutesGenerator
 
                 if ($type === 'hasMany') {
                     $nestedWebRoute = "use $webRelatedControllerNamespace;\nRoute::resource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
-                    $nestedApiRoute = "use $apiRelatedControllerNamespace;\nRoute::apiResource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);";
+
+                    $nestedApiRoute = [
+                        "use $apiRelatedControllerNamespace;",
+                        "Route::middleware('auth:sanctum')->apiResource('$modelSnakePlural/{".Str::snake($modelName)."}/$relatedModelPlural', {$relatedController}::class);"
+                    ];
 
                     $this->appendRoute(base_path('routes/web.php'), $nestedWebRoute);
                     $this->appendRoute(base_path('routes/api.php'), $nestedApiRoute);
@@ -68,13 +76,54 @@ class RoutesGenerator
         }
     }
 
-    protected function appendRoute($filePath, $routeCode)
+    protected function appendRoute($filePath, $lines)
     {
         $contents = File::get($filePath);
 
-        // Avoid duplicate imports or routes
-        if (!str_contains($contents, $routeCode)) {
-            File::append($filePath, "\n$routeCode\n");
+        // Normalize to array and flatten multi-line strings
+        $lines = is_array($lines) ? $lines : [$lines];
+        $flattenedLines = [];
+
+        foreach ($lines as $line) {
+            $split = preg_split('/\r\n|\r|\n/', $line);
+            foreach ($split as $l) {
+                $trimmed = trim($l);
+                if ($trimmed !== '') {
+                    $flattenedLines[] = $trimmed;
+                }
+            }
+        }
+
+        $existingImports = [];
+        $existingRoutes = [];
+
+        foreach (explode("\n", $contents) as $line) {
+            $trimmed = trim($line);
+            if (str_starts_with($trimmed, 'use ')) {
+                $existingImports[] = $trimmed;
+            } elseif (str_starts_with($trimmed, 'Route::')) {
+                $existingRoutes[] = $trimmed;
+            }
+        }
+
+        $toAppend = [];
+
+        foreach ($flattenedLines as $line) {
+            if (str_starts_with($line, 'use ')) {
+                if (!in_array($line, $existingImports)) {
+                    $toAppend[] = $line;
+                }
+            } elseif (str_starts_with($line, 'Route::')) {
+                if (!in_array($line, $existingRoutes)) {
+                    $toAppend[] = $line;
+                }
+            }
+        }
+
+        if (!empty($toAppend)) {
+            File::append($filePath, "\n" . implode("\n", $toAppend) . "\n");
         }
     }
+
+
 }

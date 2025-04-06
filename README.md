@@ -92,8 +92,8 @@ Password: password
 - You can log in from both web and API interfaces.
 - New users can register via:
 ```
--Web: /register
--API: /api/register
+Web: /register
+API: /api/register
 ```
 
 **Note: While an admin user is seeded for convenience, the system supports standard user registration through both web and API routes.**
