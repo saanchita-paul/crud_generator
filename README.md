@@ -13,26 +13,35 @@ A custom Laravel CRUD Generator that allows developers to scaffold complete reso
 - Automatic duplicate prevention in route imports and declarations
 - Reset command to clean up only generated files
 
+## Debugging & Monitoring
+# Laravel Telescope
+Laravel Telescope is installed and available for local development debugging and monitoring.
+
+- Access it via: **/telescope**
+- It provides insights into:
+  - Requests
+  - Exceptions
+  - Logs
+  - Queues
+  - Database queries
+  - And more.
+
+Make sure TELESCOPE_ENABLED=true is set in your .env file if you're not seeing it.
+
 
 ## File Structure
 
 Generator logic is modularized in the App\Services\CrudGenerator directory, with responsibilities split into:
 
 - ModelGenerator
-
 - MigrationGenerator
-
 - ApiControllerGenerator
-
 - WebControllerGenerator
-
 - RequestGenerator
-
 - ViewsGenerator
-
 - RoutesGenerator
 
-Each class is responsible for generating or cleaning up specific parts of the Laravel resource.
+Each class is responsible for generating specific parts of the Laravel resource.
 
 
 
@@ -55,6 +64,7 @@ cd crud_generator
 
 ```
 composer install
+npm intall
 ```
 
 - Copy the .env.example file to .env:
@@ -108,6 +118,7 @@ php artisan db:seed
 
 ```
 php artisan serve
+npm run dev
 ```
 
 ## Usage
@@ -123,27 +134,56 @@ php artisan make:crud Project --fields="name:string, description:text, status:en
 This will generate:
 
 - Project model with proper fillable attributes and relationship
-
 - Migration file with all fields and types
-
 - Form Request (ProjectRequest) with validation rules
-
 - RESTful Controller (ProjectController) with all resource methods
-
 - API and web routes
-
 - Blade views (index, create, edit, show) using components
-
 - If --relations provided: Related model/controller/migration + nested routes
 
 
 Visit [localhost](http://localhost:8000) in your web browser to use the application.
 
 
+## Reset Command
+
+Use php artisan crud:reset --dry-run to preview which files and route entries would be deleted without actually removing anything.
+Helpful for reviewing changes before running the full reset.
+```
+php artisan crud:reset --dry-run
+```
+Remove a previously generated CRUD resource:
+```
+php artisan crud:reset
+```
+This command only deletes files generated via **make:crud**, without touching unrelated resources.
 
 
+##  Test Coverage
+The generator includes test cases to verify:
+
+- File generation
+- Route registration
+- No duplicate routes/imports
+- Reset command cleanup
 
 
+## Highlights
+- Relationship-based nested route generation
+- Auto-sanitization of route files to avoid duplicates
+- Clean separation of concerns via services
+- Support for both API and web routes
 
 
+# Future Enhancements
+- BelongsToMany / Morph relationships support
+- Custom API Resource classes
+- Web dashboard to track generated resources
+- UI schema-based CRUD generation
+- Currently, **crud:reset** deletes only the main model and its resources.
+  - In the future, it will also delete related models (e.g., Task for Project with hasMany).
+- Related Controller Namespaces Not Removed
+    - When resetting a model using php artisan crud:reset, any related controller namespaces (like use App\Http\Controllers\TaskController; used in nested or relation-based routes) are not automatically removed from web.php or api.php.
+      This is because the reset process only targets the model(s) directly listed in the crud_models.json file.
+    - Will be considered in a future enhancement.
 [Check Postman API Documentation](https://documenter.getpostman.com/view/15919922/2sB2cUCP3W)
