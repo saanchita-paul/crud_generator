@@ -14,7 +14,7 @@ A custom Laravel CRUD Generator that allows developers to scaffold complete reso
 - Reset command to clean up only generated files
 
 ## Debugging & Monitoring
-# Laravel Telescope
+#### Laravel Telescope
 Laravel Telescope is installed and available for local development debugging and monitoring.
 
 - Access it via: **/telescope**
