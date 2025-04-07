@@ -11,13 +11,6 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-use App\Http\Controllers\Api\ProjectController;
-Route::middleware('auth:sanctum')->apiResource('projects', ProjectController::class);
 
-use App\Http\Controllers\Api\TaskController;
-Route::middleware('auth:sanctum')->apiResource('projects/{project}/tasks', TaskController::class);
 
-use App\Http\Controllers\Api\DeveloperController;
-Route::middleware('auth:sanctum')->apiResource('developers', DeveloperController::class);
 
-Route::middleware('auth:sanctum')->apiResource('developers/{developer}/projects', ProjectController::class);
