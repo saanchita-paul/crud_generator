@@ -28,10 +28,10 @@ class CrudReset extends Command
             $modelSnake = Str::snake($model);
             $modelPluralSnake = Str::plural($modelSnake);
 
-            // Delete model
+            // Clean model
             $this->deleteFile(app_path("Models/{$modelStudly}.php"), $dryRun);
 
-            // Delete migration
+            // Clean migration
             $migrationFiles = File::files(database_path('migrations'));
             foreach ($migrationFiles as $migration) {
                 if (Str::contains($migration->getFilename(), Str::snake($modelStudly))) {
@@ -39,16 +39,16 @@ class CrudReset extends Command
                 }
             }
 
-            // Delete API controller
+            // Clean API controller
             $this->deleteFile(app_path("Http/Controllers/Api/{$modelStudly}Controller.php"), $dryRun);
 
-            // Delete Web controller
+            // Clean Web controller
             $this->deleteFile(app_path("Http/Controllers/{$modelStudly}Controller.php"), $dryRun);
 
-            // Delete request
+            // Clean request
             $this->deleteFile(app_path("Http/Requests/{$modelStudly}Request.php"), $dryRun);
 
-            // Delete views
+            // Clean views
             $viewPath = resource_path("views/{$modelPluralSnake}");
             if (File::exists($viewPath)) {
                 if ($dryRun) {
@@ -101,12 +101,12 @@ class CrudReset extends Command
         foreach ($lines as $line) {
             $trimmed = trim($line);
 
-            // Remove use statements for the specific controller
+
             $isUseForWeb = Str::contains($trimmed, "use App\\Http\\Controllers\\{$webController};");
             $isUseForApi = Str::contains($trimmed, "use App\\Http\\Controllers\\Api\\") &&
                 Str::contains($trimmed, "{$modelStudly}Controller");
 
-            // Remove route lines referencing those controllers
+
             $isRouteLine = Str::contains($trimmed, 'Route::');
             $referencesModel = Str::contains($trimmed, strtolower($modelStudly)) ||
                 Str::contains($trimmed, "{$modelStudly}Controller");
