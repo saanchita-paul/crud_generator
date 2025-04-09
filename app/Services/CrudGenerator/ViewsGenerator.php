@@ -27,19 +27,19 @@ class ViewsGenerator
             $fieldType = isset($fieldParts[1]) ? trim($fieldParts[1]) : 'string';
 
             if (!$fieldName || str_contains($fieldName, ')')) {
-                continue; // skip malformed fields
+                continue;
             }
 
             $fieldHeaders .= "                    <th>" . ucfirst($fieldName) . "</th>\n";
             $fieldRows .= "                        <td>{{ \${$variableName}->$fieldName }}</td>\n";
 
-            // Generate form field
+
             $formFields .= "            <div class='mb-3'>\n";
             $formFields .= "                <label class='form-label'>" . ucfirst($fieldName) . "</label>\n";
 
             if (str_starts_with($fieldType, 'enum(')) {
-                // Parse enum values
-                $enumValues = substr($fieldType, 5, -1); // remove 'enum(' and ')'
+
+                $enumValues = substr($fieldType, 5, -1);
                 $values = array_map(fn($value) => trim($value, " '\""), explode(',', $enumValues));
                 $formFields .= "                <select class='form-control' name='$fieldName'>\n";
                 $formFields .= "                    @foreach(['" . implode("','", $values) . "'] as \$val)\n";

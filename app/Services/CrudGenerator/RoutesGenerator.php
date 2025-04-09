@@ -13,11 +13,11 @@ class RoutesGenerator
         $webControllerNamespace = "App\Http\Controllers\\$controller";
         $apiControllerNamespace = "App\Http\Controllers\Api\\$controller";
 
-        // Ensure the `web.php` and `api.php` files have `<?php` and proper imports
+
         $this->ensureRouteFile(base_path('routes/web.php'));
         $this->ensureRouteFile(base_path('routes/api.php'));
 
-        // Append resource routes
+
         $this->appendRoute(base_path('routes/web.php'), "use $webControllerNamespace;\nRoute::resource('$modelSnakePlural', $controller::class);");
 
         $this->appendRoute(base_path('routes/api.php'), [
@@ -27,7 +27,7 @@ class RoutesGenerator
 
         $command->info("Routes for $modelName added successfully.");
 
-        // Handle nested resource routes for hasMany relationships
+
         if (!empty($relations)) {
             if (is_string($relations)) {
                 $relations = explode(',', $relations);
@@ -80,7 +80,7 @@ class RoutesGenerator
     {
         $contents = File::get($filePath);
 
-        // Normalize to array and flatten multi-line strings
+
         $lines = is_array($lines) ? $lines : [$lines];
         $flattenedLines = [];
 

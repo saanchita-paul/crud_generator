@@ -10,7 +10,3 @@ Route::prefix('auth')->group(function () {
         Route::get('/user', [AuthController::class, 'apiUser']);
     });
 });
-
-
-
-

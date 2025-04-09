@@ -27,7 +27,7 @@ class RequestGenerator
 
             [$name, $type] = $fieldParts;
 
-            // Handle enum fields specially
+
             if (str_starts_with($type, 'enum(') && str_ends_with($type, ')')) {
                 $enumValues = str_replace(['enum(', ')'], '', $type);
                 $cleanValues = implode(',', array_map(
@@ -36,7 +36,7 @@ class RequestGenerator
                 ));
                 $validationRules .= "'$name' => 'required|in:$cleanValues',\n            ";
             } else {
-                // Handle regular field types
+
                 switch ($type) {
                     case 'string':
                         $validationRules .= "'$name' => 'required|string|max:255',\n            ";

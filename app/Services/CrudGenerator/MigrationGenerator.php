@@ -14,7 +14,7 @@ class MigrationGenerator
 
         $tableNames = [Str::snake(Str::plural($modelName))];
 
-        // Check if relations are provided
+
         $relationsOption = $command->option('relations');
         if ($relationsOption) {
             $relations = is_array($relationsOption)
@@ -36,7 +36,7 @@ class MigrationGenerator
                 continue;
             }
             $migrationName = 'create_' . $tableName . '_table';
-            // Check if migration already exists
+
             $migrationPath = database_path('migrations');
             $existingMigration = collect(File::files($migrationPath))
                 ->first(fn($file) => str_contains($file->getFilename(), $migrationName));
@@ -49,7 +49,7 @@ class MigrationGenerator
             $timestamp = now()->format('Y_m_d_His');
             $migrationFile = database_path("migrations/{$timestamp}_{$migrationName}.php");
 
-            // Ensure migrations directory exists
+
             if (!File::exists(database_path('migrations'))) {
                 File::makeDirectory(database_path('migrations'), 0755, true);
             }
@@ -67,14 +67,14 @@ class MigrationGenerator
                 $name = substr($field, 0, $firstColonPos);
                 $typeDefinition = substr($field, $firstColonPos + 1);
 
-                // Handle enum fields
+
                 if (str_starts_with($typeDefinition, 'enum(')) {
                     $enumValues = substr($typeDefinition, 5, -1); // Remove 'enum(' and ')'
                     $values = array_map(fn($value) => "'" . trim($value, " '") . "'", explode(',', $enumValues));
                     $valuesString = implode(', ', $values);
                     $schemaFields .= "\$table->enum('$name', [$valuesString]);\n            ";
                 } else {
-                    // Handle regular field types
+
                     $schemaFields .= match ($typeDefinition) {
                         'string' => "\$table->string('$name');\n            ",
                         'text' => "\$table->text('$name')->nullable();\n            ",
