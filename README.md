@@ -43,6 +43,9 @@ Generator logic is modularized in the App\Services\CrudGenerator directory, with
 
 Each class is responsible for generating specific parts of the Laravel resource.
 
+## Requirements
+This project is built with Laravel 12. Make sure your environment meets the following minimum requirements:
+- PHP >= 8.2
 
 
 ## Installation
