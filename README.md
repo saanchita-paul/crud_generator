@@ -184,6 +184,13 @@ The generator includes test cases to verify:
   - In the future, it will also delete related models (e.g., Task for Project with hasMany).
 - Related Controller Namespaces Not Removed
     - When resetting a model using php artisan crud:reset, any related controller namespaces (like use App\Http\Controllers\TaskController; used in nested or relation-based routes) are not automatically removed from web.php or api.php.
-      This is because the reset process only targets the model(s) directly listed in the crud_models.json file.
+      This is because the reset process only targets the model directly listed in the crud_models.json file.
     - Will be considered in a future enhancement.
+
+
+
+
+
+
+
 [Check Postman API Documentation](https://documenter.getpostman.com/view/15919922/2sB2cUCP3W)
